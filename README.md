@@ -24,7 +24,7 @@ A smart terminal management plugin for Neovim that provides intelligent terminal
 
 ```lua
 {
-  "your-username/nvim-smart-terminals",
+  "booka66/nvim-smart-terminals",
   dependencies = { "akinsho/toggleterm.nvim" },
   config = function()
     require("smart-terminals").setup()
@@ -36,7 +36,7 @@ A smart terminal management plugin for Neovim that provides intelligent terminal
 
 ```lua
 use {
-  "your-username/nvim-smart-terminals",
+  "booka66/nvim-smart-terminals",
   requires = { "akinsho/toggleterm.nvim" },
   config = function()
     require("smart-terminals").setup()
@@ -47,37 +47,41 @@ use {
 ## Key Mappings
 
 ### Terminal Management
-| Key | Mode | Description |
-|-----|------|-------------|
-| `<M-t>` / `<D-t>` | n,i,t | Create new terminal tab |
-| `<C-Tab>` | n,i,t | Cycle through terminals |
-| `<C-S-Tab>` | n,i,t | Cycle backwards through terminals |
-| `<C-\>` | n,i,t | Toggle current terminal |
+
+| Key               | Mode  | Description                       |
+| ----------------- | ----- | --------------------------------- |
+| `<M-t>` / `<D-t>` | n,i,t | Create new terminal tab           |
+| `<C-Tab>`         | n,i,t | Cycle through terminals           |
+| `<C-S-Tab>`       | n,i,t | Cycle backwards through terminals |
+| `<C-\>`           | n,i,t | Toggle current terminal           |
 
 ### Terminal Control (Terminal Mode)
-| Key | Mode | Description |
-|-----|------|-------------|
-| `<C-w>` / `<D-w>` / `<M-w>` | t | Close current terminal |
-| `<C-h/j/k/l>` | t | Navigate to adjacent windows |
-| `<C-x>` | t | Exit terminal mode |
+
+| Key                         | Mode | Description                  |
+| --------------------------- | ---- | ---------------------------- |
+| `<C-w>` / `<D-w>` / `<M-w>` | t    | Close current terminal       |
+| `<C-h/j/k/l>`               | t    | Navigate to adjacent windows |
+| `<C-x>`                     | t    | Exit terminal mode           |
 
 ### Quick Terminal Types
-| Key | Mode | Description |
-|-----|------|-------------|
-| `<leader>tg` | n | Git terminal |
-| `<leader>td` | n | Dev server terminal |
-| `<leader>tt` | n | Test terminal |
-| `<leader>tc` | n | Claude terminal (auto-runs `claude` command) |
+
+| Key          | Mode | Description                                  |
+| ------------ | ---- | -------------------------------------------- |
+| `<leader>tg` | n    | Git terminal                                 |
+| `<leader>td` | n    | Dev server terminal                          |
+| `<leader>tt` | n    | Test terminal                                |
+| `<leader>tc` | n    | Claude terminal (auto-runs `claude` command) |
 
 ### Advanced Features
-| Key | Mode | Description |
-|-----|------|-------------|
-| `<leader>ti` | n | Show terminal info |
-| `<leader>tr` | n | Run project command (npm/cargo aware) |
-| `<leader>ts` | n/v | Send line/selection to terminal |
-| `<leader>tn` | n | Rename current terminal |
-| `<leader>tK` | n | Kill all terminals |
-| `<leader>tp` | n | Pick terminal (fuzzy finder style) |
+
+| Key          | Mode | Description                           |
+| ------------ | ---- | ------------------------------------- |
+| `<leader>ti` | n    | Show terminal info                    |
+| `<leader>tr` | n    | Run project command (npm/cargo aware) |
+| `<leader>ts` | n/v  | Send line/selection to terminal       |
+| `<leader>tn` | n    | Rename current terminal               |
+| `<leader>tK` | n    | Kill all terminals                    |
+| `<leader>tp` | n    | Pick terminal (fuzzy finder style)    |
 
 ## Configuration
 
@@ -129,19 +133,25 @@ This plugin is designed to work alongside toggleterm.nvim. Here's a recommended 
 ## Smart Features
 
 ### Directory Detection
+
 The plugin automatically detects the best directory for new terminals:
+
 1. If in a git repository, opens terminal in git root
 2. Otherwise, uses current file's directory
 3. Falls back to current working directory
 
 ### Project Command Runner
+
 When you use `<leader>tr`, the plugin detects your project type:
+
 - **npm projects**: Offers `npm run dev`, `npm run build`, `npm run test`, `npm install`
 - **Cargo projects**: Offers `cargo run`, `cargo build`, `cargo test`, `cargo check`
 - **Other projects**: Prompts for custom command
 
 ### Named Terminals
+
 Create specific terminals for different purposes:
+
 - **Git terminal**: For git operations
 - **Dev Server terminal**: For running development servers
 - **Test terminal**: For running tests
@@ -183,3 +193,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 MIT License
+
