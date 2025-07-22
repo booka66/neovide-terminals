@@ -158,10 +158,11 @@ local function new_terminal(name, dir)
   local terminal_dir = dir or get_smart_dir()
   local terminal_name = name or ("Terminal " .. term_count)
   
-  -- Create tmux session name
+  -- Create tmux session name with consistent naming
   local session_name
   if name then
-    session_name = "smart-terminals-" .. name:lower():gsub("%s+", "-")
+    local clean_name = name:lower():gsub("[%s%-]+", "-"):gsub("^%-+", ""):gsub("%-+$", "")
+    session_name = "smart-terminals-" .. clean_name
   else
     session_name = "smart-terminals-term-" .. term_count
   end
@@ -228,7 +229,8 @@ local function create_predefined_terminal(name)
   local idx, term = find_terminal_by_name(name)
   
   -- Check if tmux session exists even if we don't have a terminal object for it
-  local session_name = "smart-terminals-" .. name:lower():gsub("%s+", "-")
+  local clean_name = name:lower():gsub("[%s%-]+", "-"):gsub("^%-+", ""):gsub("%-+$", "")
+  local session_name = "smart-terminals-" .. clean_name
   local use_tmux = tmux.is_available()
   
   if term then
@@ -266,7 +268,8 @@ end
 M.create_claude_terminal = function()
   local name = "Claude"
   local idx, term = find_terminal_by_name(name)
-  local session_name = "smart-terminals-" .. name:lower():gsub("%s+", "-")
+  local clean_name = name:lower():gsub("[%s%-]+", "-"):gsub("^%-+", ""):gsub("%-+$", "")
+  local session_name = "smart-terminals-" .. clean_name
   local use_tmux = tmux.is_available()
   local should_send_command = false
   
@@ -486,10 +489,14 @@ M.show_terminal_info = function()
   end
 
   local info = "Terminals (" .. #terminals .. "):\n"
-  for i, _ in ipairs(terminals) do
-    local name = terminal_names[terminals[i].count] or "Terminal " .. i
+  for i, term in ipairs(terminals) do
+    local name = terminal_names[term.count] or "Terminal " .. i
     local current_marker = (i == current_term) and " (current)" or ""
-    info = info .. "  " .. i .. ": " .. name .. current_marker .. "\n"
+    local session_info = ""
+    if term.use_tmux and term.tmux_session then
+      session_info = " [tmux: " .. term.tmux_session .. "]"
+    end
+    info = info .. "  " .. i .. ": " .. name .. current_marker .. session_info .. "\n"
   end
   print(info)
 end
