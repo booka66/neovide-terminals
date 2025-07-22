@@ -6,6 +6,46 @@ local current_term = 1
 local terminal_names = {}
 local terminal_scroll_positions = {}
 
+-- Tmux utility functions
+local tmux = {}
+
+function tmux.is_available()
+  return vim.fn.executable("tmux") == 1
+end
+
+function tmux.session_exists(session_name)
+  if not tmux.is_available() then return false end
+  local result = vim.fn.system("tmux has-session -t " .. vim.fn.shellescape(session_name) .. " 2>/dev/null")
+  return vim.v.shell_error == 0
+end
+
+function tmux.create_session(session_name, start_dir)
+  if not tmux.is_available() then return false end
+  local cmd = "tmux new-session -d -s " .. vim.fn.shellescape(session_name)
+  if start_dir then
+    cmd = cmd .. " -c " .. vim.fn.shellescape(start_dir)
+  end
+  vim.fn.system(cmd)
+  return vim.v.shell_error == 0
+end
+
+function tmux.kill_session(session_name)
+  if not tmux.is_available() then return false end
+  vim.fn.system("tmux kill-session -t " .. vim.fn.shellescape(session_name) .. " 2>/dev/null")
+  return vim.v.shell_error == 0
+end
+
+function tmux.list_sessions()
+  if not tmux.is_available() then return {} end
+  local output = vim.fn.system("tmux list-sessions -F '#{session_name}' 2>/dev/null")
+  if vim.v.shell_error ~= 0 then return {} end
+  local sessions = {}
+  for session in output:gmatch("[^\r\n]+") do
+    table.insert(sessions, session)
+  end
+  return sessions
+end
+
 local function save_scroll_position(term)
   if term.window and vim.api.nvim_win_is_valid(term.window) then
     local cursor_pos = vim.api.nvim_win_get_cursor(term.window)
@@ -115,14 +155,42 @@ end
 
 local function new_terminal(name, dir)
   term_count = term_count + 1
-  local Terminal = require("toggleterm.terminal").Terminal
   local terminal_dir = dir or get_smart_dir()
   local terminal_name = name or ("Terminal " .. term_count)
-
+  
+  -- Create tmux session name
+  local session_name
+  if name then
+    session_name = "smart-terminals-" .. name:lower():gsub("%s+", "-")
+  else
+    session_name = "smart-terminals-term-" .. term_count
+  end
+  
+  -- Check if we should use tmux or fall back to regular terminal
+  local use_tmux = tmux.is_available()
+  
+  if use_tmux then
+    -- Create or attach to tmux session
+    if not tmux.session_exists(session_name) then
+      if not tmux.create_session(session_name, terminal_dir) then
+        use_tmux = false
+        vim.notify("Failed to create tmux session, falling back to regular terminal", vim.log.levels.WARN)
+      end
+    end
+  end
+  
+  local Terminal = require("toggleterm.terminal").Terminal
+  local cmd = nil
+  
+  if use_tmux then
+    cmd = "tmux attach-session -t " .. vim.fn.shellescape(session_name)
+  end
+  
   local new_term = Terminal:new({
     count = term_count,
     direction = "float",
-    dir = terminal_dir,
+    dir = use_tmux and nil or terminal_dir,
+    cmd = cmd,
     float_opts = {
       border = "none",
       width = function()
@@ -145,7 +213,11 @@ local function new_terminal(name, dir)
       cleanup_title_window(term)
     end,
   })
-
+  
+  -- Store session info
+  new_term.tmux_session = use_tmux and session_name or nil
+  new_term.use_tmux = use_tmux
+  
   table.insert(terminals, new_term)
   terminal_names[term_count] = terminal_name
   current_term = #terminals
@@ -154,7 +226,13 @@ end
 
 local function create_predefined_terminal(name)
   local idx, term = find_terminal_by_name(name)
+  
+  -- Check if tmux session exists even if we don't have a terminal object for it
+  local session_name = "smart-terminals-" .. name:lower():gsub("%s+", "-")
+  local use_tmux = tmux.is_available()
+  
   if term then
+    -- Terminal object exists, toggle it
     current_term = idx
     if term:is_open() then
       save_scroll_position(term)
@@ -164,7 +242,11 @@ local function create_predefined_terminal(name)
       vim.cmd("startinsert")
       restore_scroll_position(term)
     end
+  elseif use_tmux and tmux.session_exists(session_name) then
+    -- Tmux session exists but no terminal object, create terminal that attaches to existing session
+    new_terminal(name, get_smart_dir())
   else
+    -- Create new terminal (and session if using tmux)
     new_terminal(name, get_smart_dir())
   end
 end
@@ -184,7 +266,12 @@ end
 M.create_claude_terminal = function()
   local name = "Claude"
   local idx, term = find_terminal_by_name(name)
+  local session_name = "smart-terminals-" .. name:lower():gsub("%s+", "-")
+  local use_tmux = tmux.is_available()
+  local should_send_command = false
+  
   if term then
+    -- Terminal object exists, toggle it
     current_term = idx
     if term:is_open() then
       save_scroll_position(term)
@@ -194,11 +281,27 @@ M.create_claude_terminal = function()
       vim.cmd("startinsert")
       restore_scroll_position(term)
     end
-  else
+  elseif use_tmux and tmux.session_exists(session_name) then
+    -- Tmux session exists but no terminal object, create terminal that attaches to existing session
     new_terminal(name, get_smart_dir())
+  else
+    -- Create new terminal (and session if using tmux)
+    should_send_command = true
+    new_terminal(name, get_smart_dir())
+  end
+  
+  -- Send claude command only if we created a brand new terminal/session
+  if should_send_command then
     vim.defer_fn(function()
       if #terminals > 0 and terminals[current_term] then
-        terminals[current_term]:send("claude")
+        if terminals[current_term].use_tmux then
+          -- Send command to tmux session
+          local cmd = "tmux send-keys -t " .. vim.fn.shellescape(session_name) .. " 'claude' Enter"
+          vim.fn.system(cmd)
+        else
+          -- Send to regular terminal
+          terminals[current_term]:send("claude")
+        end
       end
     end, 100)
   end
@@ -344,8 +447,13 @@ M.close_current_terminal = function()
 
   if terminals[current_term] then
     local old_count = terminals[current_term].count
+    local session_name = terminals[current_term].tmux_session
+    
     terminals[current_term]:close()
 
+    -- Note: We keep tmux sessions running for persistence
+    -- Users can manually kill sessions with :lua require('smart-terminals').kill_tmux_session('session-name')
+    
     table.remove(terminals, current_term)
     if terminal_names[old_count] then
       terminal_names[old_count] = nil
@@ -390,11 +498,22 @@ M.send_line_to_terminal = function()
   if #terminals == 0 then
     new_terminal()
   end
+  
   local line = vim.fn.getline(".")
-  terminals[current_term]:send(line .. "\r")
-  if not terminals[current_term]:is_open() then
-    terminals[current_term]:toggle()
-    restore_scroll_position(terminals[current_term])
+  local term = terminals[current_term]
+  
+  if term.use_tmux and term.tmux_session then
+    -- Send to tmux session
+    local cmd = "tmux send-keys -t " .. vim.fn.shellescape(term.tmux_session) .. " " .. vim.fn.shellescape(line) .. " Enter"
+    vim.fn.system(cmd)
+  else
+    -- Send to regular terminal
+    term:send(line .. "\r")
+  end
+  
+  if not term:is_open() then
+    term:toggle()
+    restore_scroll_position(term)
   end
 end
 
@@ -415,10 +534,20 @@ M.send_selection_to_terminal = function()
   end
 
   local text = table.concat(lines, "\n")
-  terminals[current_term]:send(text .. "\r")
-  if not terminals[current_term]:is_open() then
-    terminals[current_term]:toggle()
-    restore_scroll_position(terminals[current_term])
+  local term = terminals[current_term]
+  
+  if term.use_tmux and term.tmux_session then
+    -- Send to tmux session
+    local cmd = "tmux send-keys -t " .. vim.fn.shellescape(term.tmux_session) .. " " .. vim.fn.shellescape(text) .. " Enter"
+    vim.fn.system(cmd)
+  else
+    -- Send to regular terminal
+    term:send(text .. "\r")
+  end
+  
+  if not term:is_open() then
+    term:toggle()
+    restore_scroll_position(term)
   end
 end
 
@@ -468,7 +597,72 @@ M.kill_all_terminals = function()
   terminal_scroll_positions = {}
   current_term = 1
   term_count = 0
-  print("All terminals closed")
+  print("All terminals closed (tmux sessions remain active)")
+end
+
+-- Utility function to kill a specific tmux session
+M.kill_tmux_session = function(session_name)
+  if tmux.is_available() then
+    local success = tmux.kill_session(session_name)
+    if success then
+      print("Killed tmux session: " .. session_name)
+    else
+      print("Failed to kill tmux session: " .. session_name)
+    end
+  else
+    print("tmux not available")
+  end
+end
+
+-- Utility function to list all smart-terminals tmux sessions
+M.list_tmux_sessions = function()
+  if not tmux.is_available() then
+    print("tmux not available")
+    return
+  end
+  
+  local all_sessions = tmux.list_sessions()
+  local smart_sessions = {}
+  
+  for _, session in ipairs(all_sessions) do
+    if session:match("^smart%-terminals%-") then
+      table.insert(smart_sessions, session)
+    end
+  end
+  
+  if #smart_sessions == 0 then
+    print("No smart-terminals tmux sessions found")
+  else
+    print("Smart-terminals tmux sessions:")
+    for _, session in ipairs(smart_sessions) do
+      print("  " .. session)
+    end
+  end
+end
+
+-- Kill all smart-terminals tmux sessions
+M.kill_all_tmux_sessions = function()
+  if not tmux.is_available() then
+    print("tmux not available")
+    return
+  end
+  
+  local all_sessions = tmux.list_sessions()
+  local killed_count = 0
+  
+  for _, session in ipairs(all_sessions) do
+    if session:match("^smart%-terminals%-") then
+      if tmux.kill_session(session) then
+        killed_count = killed_count + 1
+      end
+    end
+  end
+  
+  if killed_count > 0 then
+    print("Killed " .. killed_count .. " smart-terminals tmux sessions")
+  else
+    print("No smart-terminals tmux sessions to kill")
+  end
 end
 
 M.pick_terminal = function()
@@ -593,6 +787,8 @@ M.setup = function(opts)
   map("n", "<leader>tn", M.rename_terminal, { desc = "Rename terminal" })
   map("n", "<leader>tK", M.kill_all_terminals, { desc = "Kill all terminals" })
   map("n", "<leader>tp", M.pick_terminal, { desc = "Pick terminal" })
+  map("n", "<leader>tl", M.list_tmux_sessions, { desc = "List tmux sessions" })
+  map("n", "<leader>tX", M.kill_all_tmux_sessions, { desc = "Kill all tmux sessions" })
 end
 
 return M
