@@ -1,13 +1,12 @@
-# nvim-smart-terminals
+# neovide-terminals
 
-A smart terminal management plugin for Neovim that provides intelligent terminal handling, project-aware directory switching, and advanced terminal features.
+A smart terminal management plugin for Neovide that provides intelligent terminal handling, project-aware directory switching, and advanced terminal features.
 
 ## Features
 
 - **Smart Directory Detection**: Automatically opens terminals in git root or current file directory
 - **Named Terminal Management**: Create and manage multiple named terminals (Git, Dev Server, Tests, Claude)
 - **Scroll Position Memory**: Remembers terminal scroll positions when switching between terminals
-- **Project Command Runner**: Smart detection of npm/cargo projects with pre-configured commands
 - **Terminal Tab Management**: Cycle through terminals like browser tabs
 - **Send Code to Terminal**: Send current line or visual selection to terminal
 - **Floating Titles**: Beautiful terminal titles showing terminal names
@@ -74,14 +73,12 @@ use {
 
 ### Advanced Features
 
-| Key          | Mode | Description                           |
-| ------------ | ---- | ------------------------------------- |
-| `<leader>ti` | n    | Show terminal info                    |
-| `<leader>tr` | n    | Run project command (npm/cargo aware) |
-| `<leader>ts` | n/v  | Send line/selection to terminal       |
-| `<leader>tn` | n    | Rename current terminal               |
-| `<leader>tK` | n    | Kill all terminals                    |
-| `<leader>tp` | n    | Pick terminal (fuzzy finder style)    |
+| Key          | Mode | Description                        |
+| ------------ | ---- | ---------------------------------- |
+| `<leader>ti` | n    | Show terminal info                 |
+| `<leader>tn` | n    | Rename current terminal            |
+| `<leader>tK` | n    | Kill all terminals                 |
+| `<leader>tp` | n    | Pick terminal (fuzzy finder style) |
 
 ## Configuration
 
@@ -140,14 +137,6 @@ The plugin automatically detects the best directory for new terminals:
 2. Otherwise, uses current file's directory
 3. Falls back to current working directory
 
-### Project Command Runner
-
-When you use `<leader>tr`, the plugin detects your project type:
-
-- **npm projects**: Offers `npm run dev`, `npm run build`, `npm run test`, `npm install`
-- **Cargo projects**: Offers `cargo run`, `cargo build`, `cargo test`, `cargo check`
-- **Other projects**: Prompts for custom command
-
 ### Named Terminals
 
 Create specific terminals for different purposes:
@@ -193,4 +182,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 MIT License
-

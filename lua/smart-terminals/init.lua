@@ -517,6 +517,53 @@ M.setup = function(opts)
     return
   end
 
+  -- Prevent double setup
+  if vim.g.smart_terminals_setup_called then
+    return
+  end
+  vim.g.smart_terminals_setup_called = true
+
+  -- Set up toggleterm with the proper configuration
+  local toggleterm_opts = {
+    size = 20,
+    open_mapping = [[<c-\>]],
+    hide_numbers = true,
+    shade_terminals = true,
+    shading_factor = 2,
+    start_in_insert = true,
+    insert_mappings = true,
+    terminal_mappings = true,
+    persist_size = true,
+    persist_mode = true,
+    direction = "float",
+    close_on_exit = true,
+    shell = vim.o.shell,
+    auto_scroll = false,
+    float_opts = {
+      border = "none",
+      row = 0,
+      col = 0,
+      width = function()
+        return vim.o.columns
+      end,
+      height = function()
+        return vim.o.lines
+      end,
+      winblend = 3,
+      highlights = {
+        border = "FloatBorder",
+        background = "Normal",
+      },
+    },
+  }
+  
+  -- Merge user options with defaults
+  if opts.toggleterm then
+    toggleterm_opts = vim.tbl_deep_extend("force", toggleterm_opts, opts.toggleterm)
+  end
+  
+  require("toggleterm").setup(toggleterm_opts)
+
   local map = vim.keymap.set
 
   map({ "n", "i", "t" }, "<M-t>", function() new_terminal() end, { desc = "New terminal tab" })
