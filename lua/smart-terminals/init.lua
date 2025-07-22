@@ -596,6 +596,7 @@ M.rename_terminal = function()
 end
 
 M.kill_all_terminals = function()
+  -- Kill all terminal instances
   for _, term in ipairs(terminals) do
     term:shutdown()
   end
@@ -604,7 +605,28 @@ M.kill_all_terminals = function()
   terminal_scroll_positions = {}
   current_term = 1
   term_count = 0
-  print("All terminals closed (tmux sessions remain active)")
+  
+  -- Kill all smart-terminals tmux sessions
+  if tmux.is_available() then
+    local all_sessions = tmux.list_sessions()
+    local killed_count = 0
+    
+    for _, session in ipairs(all_sessions) do
+      if session:match("^smart%-terminals%-") then
+        if tmux.kill_session(session) then
+          killed_count = killed_count + 1
+        end
+      end
+    end
+    
+    if killed_count > 0 then
+      print("All terminals and " .. killed_count .. " tmux sessions killed")
+    else
+      print("All terminals killed (no tmux sessions found)")
+    end
+  else
+    print("All terminals killed")
+  end
 end
 
 -- Utility function to kill a specific tmux session
@@ -794,7 +816,6 @@ M.setup = function(opts)
   map("n", "<leader>tn", M.rename_terminal, { desc = "Rename terminal" })
   map("n", "<leader>tK", M.kill_all_terminals, { desc = "Kill all terminals" })
   map("n", "<leader>tp", M.pick_terminal, { desc = "Pick terminal" })
-  map("n", "<leader>tl", M.list_tmux_sessions, { desc = "List tmux sessions" })
   map("n", "<leader>tX", M.kill_all_tmux_sessions, { desc = "Kill all tmux sessions" })
 end
 
