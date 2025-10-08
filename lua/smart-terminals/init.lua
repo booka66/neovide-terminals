@@ -434,7 +434,8 @@ end
 
 M.toggle_current_terminal = function()
 	if #terminals == 0 then
-		new_terminal()
+		-- create dev terminal by default if none exist
+		M.create_dev_terminal()
 		return
 	end
 
