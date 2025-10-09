@@ -274,6 +274,80 @@ M.create_test_terminal = function()
 	create_predefined_terminal("Tests")
 end
 
+M.create_local_claude_terminal = function()
+	local name = "Local Claude"
+	local idx, term = find_terminal_by_name(name)
+	local should_send_command = false
+
+	if term then
+		-- Terminal object exists, toggle it
+		current_term = idx
+		if term:is_open() then
+			save_scroll_position(term)
+		end
+		term:toggle()
+		if term:is_open() then
+			vim.cmd("startinsert")
+			restore_scroll_position(term)
+		end
+	else
+		-- Create new terminal WITHOUT tmux - directory specific
+		should_send_command = true
+		term_count = term_count + 1
+		local terminal_dir = get_smart_dir()
+		local terminal_name = name
+
+		local Terminal = require("toggleterm.terminal").Terminal
+
+		local new_term = Terminal:new({
+			count = term_count,
+			direction = "float",
+			dir = terminal_dir,  -- Use current directory, not tmux
+			cmd = nil,  -- No tmux attachment
+			float_opts = {
+				border = "none",
+				width = function()
+					return vim.o.columns
+				end,
+				height = function()
+					return vim.o.lines
+				end,
+				row = 0,
+				col = 0,
+				winblend = 3,
+			},
+			on_open = function(term)
+				vim.cmd("startinsert")
+				vim.b.terminal_title = terminal_name
+				create_title_window(term, terminal_name)
+			end,
+			on_close = function(term)
+				save_scroll_position(term)
+				cleanup_title_window(term)
+			end,
+		})
+
+		-- Explicitly mark as NOT using tmux
+		new_term.tmux_session = nil
+		new_term.use_tmux = false
+
+		table.insert(terminals, new_term)
+		terminal_names[term_count] = terminal_name
+		current_term = #terminals
+		new_term:toggle()
+	end
+
+	-- Send claude command only if we created a brand new terminal
+	if should_send_command then
+		vim.defer_fn(function()
+			if #terminals > 0 and terminals[current_term] then
+				-- Always send to regular terminal (no tmux)
+				terminals[current_term]:send("claude")
+			end
+		end, 100)
+	end
+end
+
 M.create_claude_terminal = function()
 	local name = "Claude"
 	local idx, term = find_terminal_by_name(name)
@@ -828,6 +902,7 @@ M.setup = function(opts)
 	map_keys({ "<leader>td", "<M-j>" }, M.create_dev_terminal, { desc = "Dev server terminal" })
 	map_keys({ "<leader>tt", "<M-l>" }, M.create_test_terminal, { desc = "Test terminal" })
 	map_keys({ "<leader>tc", "<M-k>" }, M.create_claude_terminal, { desc = "Claude terminal" })
+	map_keys({ "<leader>tC" }, M.create_local_claude_terminal, { desc = "Local Claude terminal" })
 
 	map("n", "<leader>tk", M.kill_all_terminals, { desc = "Kill all terminals" })
 	map("n", "<leader>tp", M.pick_terminal, { desc = "Pick terminal" })
