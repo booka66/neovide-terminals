@@ -220,6 +220,10 @@ local function new_terminal(name, dir)
 		on_open = function(term)
 			vim.cmd("startinsert")
 			vim.b.terminal_title = terminal_name
+			-- Enable bracketed paste mode to fix paste streaming
+			if term.job_id then
+				vim.api.nvim_chan_send(term.job_id, "\027[?2004h")
+			end
 			create_title_window(term, terminal_name)
 		end,
 		on_close = function(term)
@@ -319,6 +323,10 @@ M.create_local_claude_terminal = function()
 			on_open = function(term)
 				vim.cmd("startinsert")
 				vim.b.terminal_title = terminal_name
+				-- Enable bracketed paste mode to fix paste streaming
+				if term.job_id then
+					vim.api.nvim_chan_send(term.job_id, "\027[?2004h")
+				end
 				create_title_window(term, terminal_name)
 			end,
 			on_close = function(term)
@@ -414,6 +422,10 @@ local function run_in_terminal(cmd, name)
 		close_on_exit = false,
 		on_open = function(term)
 			vim.cmd("startinsert")
+			-- Enable bracketed paste mode to fix paste streaming
+			if term.job_id then
+				vim.api.nvim_chan_send(term.job_id, "\027[?2004h")
+			end
 			create_title_window(term, command_name)
 		end,
 	})
